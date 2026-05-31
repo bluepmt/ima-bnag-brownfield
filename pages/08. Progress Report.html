@@ -5276,6 +5276,155 @@
       });
     }
 
+    /* ============================================================
+       Live progress overlay — GET /api/progress (Cloudflare Pages Function
+       → Microsoft Graph → Excel 365 workbook). When the workbook is reachable
+       its named tables overwrite the baked-in mock data above and the page
+       re-renders. On ANY failure (Graph not configured → 503, network, parse)
+       the page silently keeps the mock. Template + columns: docs/IMA_Progress.xlsx.
+       Tables: KPI, Phase, Sections, Variance, Milestones, Engineering,
+               Procurement, SCurve, WPInfo.  Only weeks already present in
+       EPCI_DATA (64/65/66) are overlaid; extra weeks in Excel are ignored.
+       ============================================================ */
+    function lpNum(v){
+      if (typeof v === "number") return v;
+      const n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+      return isNaN(n) ? 0 : n;
+    }
+    function lpStr(v){ return v == null ? "" : String(v); }
+    function lpRows(tbl){ return Array.isArray(tbl) && tbl.length > 1 ? tbl.slice(1) : []; }
+    function lpWeekCols(headers){ return headers.slice(1).map(h => String(h).replace(/^Wk/i, "").trim()); }
+
+    function applyLiveProgress(tables){
+      let applied = false;
+      const safe = (name, fn) => {
+        const tbl = tables[name];
+        if (!Array.isArray(tbl) || tbl.length < 2) return;
+        try { fn(tbl); applied = true; }
+        catch (e) { console.warn("progress table " + name + " skipped:", e); }
+      };
+
+      // KPI: Metric | Wk64 | Wk65 | Wk66  → EPCI_DATA[wk][metric] (string)
+      safe("KPI", (tbl) => {
+        const weeks = lpWeekCols(tbl[0]);
+        lpRows(tbl).forEach(r => {
+          const metric = lpStr(r[0]).trim(); if (!metric) return;
+          weeks.forEach((wk, i) => { if (EPCI_DATA[wk]) EPCI_DATA[wk][metric] = lpStr(r[i + 1]); });
+        });
+      });
+
+      // Phase: Workfront | P64 | A64 | …  → EPCI_DATA[wk].phaseProgress.{planned,actual}[rowIndex]
+      safe("Phase", (tbl) => {
+        const hdr = tbl[0];
+        lpRows(tbl).forEach((r, idx) => {
+          for (let c = 1; c < hdr.length; c++) {
+            const m = String(hdr[c]).match(/^([PA])\s*(\d+)$/i); if (!m) continue;
+            const wk = m[2], key = m[1].toUpperCase() === "P" ? "planned" : "actual";
+            const pp = EPCI_DATA[wk] && EPCI_DATA[wk].phaseProgress;
+            if (pp && Array.isArray(pp[key])) pp[key][idx] = lpNum(r[c]);
+          }
+        });
+      });
+
+      // Sections: Key (section.field) | Wk64 | …  → EPCI_DATA[wk][section][field] (string)
+      safe("Sections", (tbl) => {
+        const weeks = lpWeekCols(tbl[0]);
+        lpRows(tbl).forEach(r => {
+          const key = lpStr(r[0]).trim(); if (!key.includes(".")) return;
+          const dot = key.indexOf("."), sec = key.slice(0, dot), field = key.slice(dot + 1);
+          weeks.forEach((wk, i) => {
+            const o = EPCI_DATA[wk] && EPCI_DATA[wk][sec];
+            if (o && typeof o === "object") o[field] = lpStr(r[i + 1]);
+          });
+        });
+      });
+
+      // Variance: Week | V1..V13  → EPCI_DATA[wk].varianceData
+      safe("Variance", (tbl) => {
+        lpRows(tbl).forEach(r => {
+          const wk = lpStr(r[0]).trim();
+          if (EPCI_DATA[wk]) EPCI_DATA[wk].varianceData = r.slice(1).map(lpNum);
+        });
+      });
+
+      // Milestones: Name | Baseline | Forecast | Status
+      safe("Milestones", (tbl) => {
+        const out = lpRows(tbl).filter(r => lpStr(r[0]).trim())
+          .map(r => ({ name: lpStr(r[0]), bl: lpStr(r[1]), fc: lpStr(r[2]), status: lpStr(r[3]) }));
+        if (out.length) { PROJECT_MILESTONES.length = 0; PROJECT_MILESTONES.push(...out); }
+      });
+
+      // Engineering: Name | Actual | Target | Status
+      safe("Engineering", (tbl) => {
+        const out = lpRows(tbl).filter(r => lpStr(r[0]).trim())
+          .map(r => ({ name: lpStr(r[0]), actual: lpNum(r[1]), target: lpNum(r[2]), status: lpStr(r[3]) }));
+        if (out.length) { ENG_DISCIPLINES.length = 0; ENG_DISCIPLINES.push(...out); }
+      });
+
+      // Procurement: Name | PO | FAT | Site | Prog
+      safe("Procurement", (tbl) => {
+        const out = lpRows(tbl).filter(r => lpStr(r[0]).trim())
+          .map(r => ({ name: lpStr(r[0]), po: lpStr(r[1]), fat: lpStr(r[2]), site: lpStr(r[3]), prog: lpNum(r[4]) }));
+        if (out.length) { PROC_PACKAGES.length = 0; PROC_PACKAGES.push(...out); }
+      });
+
+      // SCurve: Month | MonthlyPhysical | MonthlyMilestone | OverallCum | MilestoneLabel | OverallPlan | WP1..WP10
+      safe("SCurve", (tbl) => {
+        const rows = lpRows(tbl); if (!rows.length) return;
+        OVERALL_SC.labels = rows.map(r => lpStr(r[0]));
+        PHYS_SCURVE.labels = OVERALL_SC.labels.slice();
+        OVERALL_SC.monthlyPhysical = rows.map(r => lpNum(r[1]));
+        OVERALL_SC.monthlyMilestone = rows.map(r => lpNum(r[2]));
+        OVERALL_SC.overallCum = rows.map(r => lpNum(r[3]));
+        OVERALL_SC.milestoneLabels = rows.map(r => lpStr(r[4]));
+        PHYS_SCURVE.overall = rows.map(r => lpNum(r[5]));
+        PHYS_SCURVE.wp = Array.from({ length: 10 }, (_, w) => rows.map(r => lpNum(r[6 + w])));
+        PHYS_SCURVE.overallActual = _mkActual(PHYS_SCURVE.overall);
+        PHYS_SCURVE.wpActual = PHYS_SCURVE.wp.map(_mkActual);
+      });
+
+      // WPInfo: WP | Name | Weight
+      safe("WPInfo", (tbl) => {
+        const rows = lpRows(tbl); if (!rows.length) return;
+        PHYS_SCURVE.names = rows.map(r => lpStr(r[1]));
+        PHYS_SCURVE.weights = rows.map(r => lpNum(r[2]));
+      });
+
+      return applied;
+    }
+
+    // Update the already-built Overall S-Curve chart in place after an overlay.
+    function refreshSCurveChart(){
+      const ch = charts.overallPhysical; if (!ch) return;
+      ch.data.labels = OVERALL_SC.labels;
+      ch.data.datasets[0].data = OVERALL_SC.monthlyPhysical;
+      ch.data.datasets[1].data = OVERALL_SC.monthlyMilestone;
+      ch.data.datasets[2].data = OVERALL_SC.overallCum;
+      ch.data.datasets[3].data = PHYS_SCURVE.overall;
+      ch.data.datasets[4].data = PHYS_SCURVE.overallActual;
+      for (let i = 0; i < 10; i++) {
+        if (ch.data.datasets[WP_PLAN_OFF + i]) ch.data.datasets[WP_PLAN_OFF + i].data = PHYS_SCURVE.wp[i];
+        if (ch.data.datasets[WP_ACT_OFF + i]) ch.data.datasets[WP_ACT_OFF + i].data = PHYS_SCURVE.wpActual[i];
+      }
+      ch.update();
+    }
+
+    async function loadLiveProgress(){
+      try {
+        const r = await fetch("/api/progress", { headers: { accept: "application/json" }, credentials: "same-origin" });
+        if (!r.ok) return;                          // 503 (Graph not configured) / 502 → keep mock
+        const j = await r.json();
+        if (!j || !j.tables || !Object.keys(j.tables).length) return;
+        if (!applyLiveProgress(j.tables)) return;
+        // drop lazily-built detail-tab charts so they rebuild fresh with new data
+        ["scheduleVariance","engStacked","engCodes","procFunnel","fabSCurve","fabNdt","siteSCurve","siteTieIn","siteCable","commMc","commPunches"]
+          .forEach(k => { if (charts[k]) { try { charts[k].destroy(); } catch (_) {} delete charts[k]; } });
+        buildEngineeringHeatmap();
+        refreshSCurveChart();
+        changeWeek(activeWeek);
+      } catch (_) { /* network/parse error → keep mock */ }
+    }
+
     /* Initialize Dashboard */
     window.addEventListener("DOMContentLoaded", function() {
       // Force Times New Roman on all Chart.js canvas text (axes, ticks, tooltips)
@@ -5306,6 +5455,9 @@
       
       // Run changeWeek to sync all databases dynamically with positive values on startup
       changeWeek(activeWeek);
+
+      // Overlay live Excel-365 data when available (non-blocking; keeps mock on failure)
+      loadLiveProgress();
     });
 
     /* Tab Switching Logic */

@@ -1,6 +1,7 @@
 node_modules
 .wrangler
 .git
+.claude
 .gitignore
 .dev.vars
 worker

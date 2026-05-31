@@ -9,6 +9,9 @@ GRAPH_*.txt
 node_modules/
 dist/
 
+# Claude Code local config (don't publish)
+.claude/
+
 # OS / editor
 .DS_Store
 Thumbs.db

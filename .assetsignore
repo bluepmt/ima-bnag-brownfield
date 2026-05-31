@@ -5,6 +5,8 @@ node_modules
 .gitignore
 .dev.vars
 worker
+db
+docs
 seed.mjs
 *.md
 *.toml

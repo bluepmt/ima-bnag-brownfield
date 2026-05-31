@@ -12,8 +12,11 @@ Cổng tài liệu web bảo mật cho dự án phát triển mỏ khí IMA (Gas
 index.html                           # Trang đăng nhập (entry point)
 CLAUDE.md                            # Tài liệu kiến trúc dự án (file này)
 AGENTS.md                            # Hướng dẫn cho Claude Code agents
-ima-kb.md                            # Knowledge base — bot đọc qua Cloudflare Worker
-pages/                               # Trang nội dung (01–08)
+ima-kb.md                            # Knowledge base — bot đọc qua Cloudflare Worker (raw URL)
+wrangler.toml                        # Cloudflare Pages config: D1 binding (env.DB) + Graph vars
+.gitignore                           # Chặn commit secret (.dev.vars, db/seed.sql, node_modules, .wrangler, .claude)
+.assetsignore                        # Loại file không-tĩnh khỏi upload Pages (worker, db, docs, *.md/.toml/.sql)
+pages/                               # Trang nội dung (01–08) — static, gate bởi middleware
   ├─ 01. Overview.html               # Tổng quan dự án
   ├─ 02. Contract Strategies.html    # Chiến lược hợp đồng
   ├─ 03. Scope of Work.html          # Phạm vi công việc + interactive PFD viewer
@@ -21,18 +24,28 @@ pages/                               # Trang nội dung (01–08)
   ├─ 05. Manhours & Schedule.html    # Nhân công & tiến độ (Gantt chart)
   ├─ 06. IMA Brownfield Project Team.html  # Đội ngũ dự án
   ├─ 07. Images & Documents.html     # Hình ảnh & tài liệu
-  └─ 08. Progress Report.html        # Progress Report placeholder
+  └─ 08. Progress Report.html        # Progress Report (Chart.js dashboard)
 scripts/                             # Shared JS/CSS (tự inject CSS riêng)
   ├─ ima-animations.js               # Engine animation (load vào mọi trang nội dung)
   ├─ ima-animations.css              # CSS animation layer (inject tự động bởi JS)
   ├─ ima-assistant.js                # Trợ lí ảo "IMA Project Assistant" (floating chatbot)
   ├─ ima-search.js                   # Full-text search overlay (Ctrl+K)
   └─ ima-anchornav.js                # Anchor nav sidebar tự động
+functions/                           # Cloudflare Pages Functions = BACKEND (BẮT BUỘC ở root)
+  ├─ _middleware.js                  # Gate auth: chặn trang/asset nếu chưa có cookie ima_sess
+  ├─ _lib/auth.js                    # PBKDF2 hash, session, cookie, audit helper
+  ├─ _lib/graph.js                   # Đọc Excel 365 qua Microsoft Graph (Progress)
+  └─ api/                            # login, logout, me, users, audit, progress
+db/                                  # Database ops (KHÔNG serve, KHÔNG runtime)
+  ├─ schema.sql                      # D1 schema: users, sessions, audit_log, documents
+  └─ seed.mjs                        # Node script sinh INSERT admin (PBKDF2)
+docs/                                # Tài liệu vận hành
+  └─ BACKEND_SETUP.md                # Hướng dẫn dựng backend/deploy từng bước (click-by-click)
 assets/                              # Ảnh, logo, sơ đồ
 Site Survey/                         # Ảnh khảo sát thực địa
-worker/                              # Cloudflare Worker proxy → Claude API (KHÔNG deploy lên web host)
+worker/                              # Cloudflare Worker proxy → Claude API (bot; KHÔNG phải Pages)
   ├─ index.js                        # Code Worker
-  ├─ wrangler.toml                   # Wrangler config (deploy CLI, tuỳ chọn)
+  ├─ wrangler.toml                   # Wrangler config riêng cho worker
   └─ package.json
 ```
 
@@ -48,7 +61,7 @@ worker/                              # Cloudflare Worker proxy → Claude API (K
 ### Tách biệt trang đăng nhập và trang nội dung
 - `index.html` là trang login duy nhất với giao diện cyberpunk HUD.
 - Auth được thực thi **phía server** bởi `functions/_middleware.js` (Cloudflare Pages): mọi request tới trang nội dung/asset bị chặn nếu không có session cookie `ima_sess` hợp lệ → redirect về `/index.html`.
-- Đoạn guard `sessionStorage` cũ ở đầu mỗi trang **đã được gỡ** (client-side, ai cũng bypass được). KHÔNG thêm lại. Middleware là lớp khoá duy nhất. Xem `BACKEND_SETUP.md`.
+- Đoạn guard `sessionStorage` cũ ở đầu mỗi trang **đã được gỡ** (client-side, ai cũng bypass được). KHÔNG thêm lại. Middleware là lớp khoá duy nhất. Xem `docs/BACKEND_SETUP.md`.
 
 ### CSS không được tách file riêng
 - Styles toàn cục (navbar, footer, reset) được inline trong mỗi trang nội dung.
@@ -62,7 +75,7 @@ worker/                              # Cloudflare Worker proxy → Claude API (K
 
 ## Quy tắc Authentication
 
-> **Auth đã chuyển sang server-side (2026-05).** Mô hình client-hash + `sessionStorage` cũ đã bỏ. Chi tiết: `BACKEND_SETUP.md` + memory `backend-architecture`.
+> **Auth đã chuyển sang server-side (2026-05).** Mô hình client-hash + `sessionStorage` cũ đã bỏ. Chi tiết: `docs/BACKEND_SETUP.md` + memory `backend-architecture`.
 
 ### Session (server-side)
 - Login qua `POST /api/login` (Cloudflare Pages Function) → verify user trong D1 → tạo session token → set cookie **HttpOnly** `ima_sess` (8h).
@@ -71,7 +84,7 @@ worker/                              # Cloudflare Worker proxy → Claude API (K
 
 ### Mật khẩu
 - Lưu trong D1 bảng `users`: `pass_hash` + `salt`, thuật toán **PBKDF2-SHA256 100k iterations** (xem `functions/_lib/auth.js`).
-- KHÔNG hardcode hash trong `index.html` nữa. Tạo user bằng `seed.mjs` (admin đầu tiên) hoặc `POST /api/users` (admin tạo thêm).
+- KHÔNG hardcode hash trong `index.html` nữa. Tạo user bằng `db/seed.mjs` (admin đầu tiên) hoặc `POST /api/users` (admin tạo thêm).
 - Phân quyền: `users.role` = `admin` | `viewer`.
 
 ### Multi-user · Audit · Nội dung động
@@ -713,7 +726,7 @@ Progress updates will be published during the project execution phase.
 - Không sửa `#lv1-gantt` hay bất kỳ phần tử con nào của nó từ `ima-animations.js`.
 - Không ghi `ima-animations.css` vào HTML bằng `<link>` thủ công — JS tự inject.
 - **Không đặt HTML content pages ra ngoài thư mục `pages/`** và không đặt shared scripts ra ngoài `scripts/` — cấu trúc thư mục đã được chuẩn hóa.
-- **Auth là server-side** (`functions/_middleware.js` + cookie `ima_sess`). KHÔNG thêm lại guard `sessionStorage`/`localStorage` client-side vào trang nội dung; KHÔNG hardcode password hash vào `index.html`. Xem `BACKEND_SETUP.md`.
+- **Auth là server-side** (`functions/_middleware.js` + cookie `ima_sess`). KHÔNG thêm lại guard `sessionStorage`/`localStorage` client-side vào trang nội dung; KHÔNG hardcode password hash vào `index.html`. Xem `docs/BACKEND_SETUP.md`.
 - Không commit file chứa mật khẩu plaintext.
 - **KHÔNG commit secrets** (`.dev.vars`, `seed.sql`, `GRAPH_CLIENT_SECRET`, `ANTHROPIC_API_KEY`) — chỉ để ở Cloudflare env/Secrets. Đã có `.gitignore`.
 - **Không hardcode `ANTHROPIC_API_KEY` (hay bất kỳ API key nào) vào `ima-assistant.js` hoặc bất kỳ file frontend nào.** Repo public — key sẽ bị abuse trong vài giờ. API key CHỈ ở Cloudflare env var.

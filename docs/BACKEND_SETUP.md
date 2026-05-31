@@ -29,7 +29,7 @@ Mở file `wrangler.toml`, thay `REPLACE_WITH_DATABASE_ID` bằng id vừa copy.
 
 Tạo bảng:
 ```powershell
-npx wrangler d1 execute ima_db --remote --file=./schema.sql
+npx wrangler d1 execute ima_db --remote --file=./db/schema.sql
 ```
 
 ---
@@ -37,11 +37,11 @@ npx wrangler d1 execute ima_db --remote --file=./schema.sql
 ## C. Tạo tài khoản admin đầu tiên
 
 ```powershell
-node seed.mjs admin "MatKhauManh_DoiNgay123" admin > seed.sql
-npx wrangler d1 execute ima_db --remote --file=./seed.sql
+node db/seed.mjs admin "MatKhauManh_DoiNgay123" admin > db/seed.sql
+npx wrangler d1 execute ima_db --remote --file=./db/seed.sql
 ```
 - `admin` = tên đăng nhập. `"MatKhau..."` = mật khẩu (đặt mạnh). `admin` cuối = quyền admin.
-- Sau khi chạy xong, **xoá file `seed.sql`** (nó chứa mật khẩu đã mã hoá — không để lại, không commit).
+- Sau khi chạy xong, **xoá file `db/seed.sql`** (nó chứa mật khẩu đã mã hoá — không để lại, không commit).
 
 Thêm user khác sau này (xem mục K) — không cần lặp bước này.
 

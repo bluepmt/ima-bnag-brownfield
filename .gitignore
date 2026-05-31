@@ -1,0 +1,14 @@
+# Secrets — NEVER commit
+.dev.vars
+.dev.vars.*
+seed.sql
+GRAPH_*.txt
+
+# Wrangler / local build
+.wrangler/
+node_modules/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db

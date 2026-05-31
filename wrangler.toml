@@ -1,0 +1,21 @@
+# Cloudflare Pages + Functions config
+# Local dev:  npx wrangler pages dev .
+# (Production bindings are set in the Cloudflare dashboard â†’ Pages â†’ Settings)
+
+name = "ima-brownfield"
+pages_build_output_dir = "."
+compatibility_date = "2024-09-23"
+
+# --- D1 database binding (env.DB) ---
+# Replace database_id with the id printed by:  npx wrangler d1 create ima_db
+[[d1_databases]]
+binding = "DB"
+database_name = "ima_db"
+database_id = "b7ef851e-2f09-497f-9d25-38b5bef1b73f"
+
+# --- Non-secret vars (Graph file location). Secrets go in dashboard / .dev.vars ---
+[vars]
+GRAPH_USER = "you@yourtenant.onmicrosoft.com"   # mailbox/drive that owns the Excel file
+GRAPH_FILE_PATH = "/IMA/Progress.xlsx"          # path inside that OneDrive (leading slash)
+GRAPH_TABLE = "Progress"                          # Excel Table name
+# Secrets (do NOT put here): GRAPH_TENANT, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET

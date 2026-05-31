@@ -13,9 +13,9 @@ binding = "DB"
 database_name = "ima_db"
 database_id = "b7ef851e-2f09-497f-9d25-38b5bef1b73f"
 
-# --- Non-secret vars (Graph file location). Secrets go in dashboard / .dev.vars ---
+# --- Progress source: a PUBLIC Google Sheet (gviz CSV). No secrets needed. ---
+# Set SHEETS_ID in the Pages dashboard (or .dev.vars locally), not here, so it
+# is easy to change without a code commit. Example shown commented out.
 [vars]
-GRAPH_USER = "you@yourtenant.onmicrosoft.com"   # mailbox/drive that owns the Excel file
-GRAPH_FILE_PATH = "/IMA/Progress.xlsx"          # path inside that OneDrive (leading slash)
-GRAPH_TABLE = "Progress"                          # Excel Table name
-# Secrets (do NOT put here): GRAPH_TENANT, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET
+# SHEETS_ID = "1AbC...XYZ"        # spreadsheet id from its URL (/d/<ID>/edit)
+# SHEETS_TABLES = "KPI,Phase,Sections,Variance,Milestones,Engineering,Procurement,SCurve,WPInfo"  # optional override

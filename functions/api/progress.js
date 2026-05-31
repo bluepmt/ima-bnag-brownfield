@@ -1,10 +1,10 @@
-// GET /api/progress  → latest Progress data pulled from Excel 365 (via Graph).
+// GET /api/progress  → latest Progress data pulled from a public Google Sheet.
 // Session required (enforced by _middleware for all /api/* except /api/login).
-import { readProgress } from '../_lib/graph.js';
+import { readProgress } from '../_lib/sheets.js';
 import { json } from '../_lib/auth.js';
 
 export async function onRequestGet({ env }) {
-  if (!env.GRAPH_CLIENT_ID) return json({ error: 'graph_not_configured' }, 503);
+  if (!env.SHEETS_ID) return json({ error: 'sheets_not_configured' }, 503);
   try {
     const { tables, errors, fetchedAt } = await readProgress(env);
     return json({ tables, errors, fetchedAt });

@@ -5278,13 +5278,14 @@
 
     /* ============================================================
        Live progress overlay — GET /api/progress (Cloudflare Pages Function
-       → Microsoft Graph → Excel 365 workbook). When the workbook is reachable
-       its named tables overwrite the baked-in mock data above and the page
-       re-renders. On ANY failure (Graph not configured → 503, network, parse)
-       the page silently keeps the mock. Template + columns: docs/IMA_Progress.xlsx.
-       Tables: KPI, Phase, Sections, Variance, Milestones, Engineering,
-               Procurement, SCurve, WPInfo.  Only weeks already present in
-       EPCI_DATA (64/65/66) are overlaid; extra weeks in Excel are ignored.
+       → functions/_lib/sheets.js → public Google Sheet as gviz CSV). When the
+       sheet is reachable its tabs overwrite the baked-in mock data above and the
+       page re-renders. On ANY failure (SHEETS_ID not set → 503, network, parse)
+       the page silently keeps the mock. Seed/columns: docs/IMA_Progress.xlsx
+       (import into Google Sheets). Tabs: KPI, Phase, Sections, Variance,
+       Milestones, Engineering, Procurement, SCurve, WPInfo (headers in row 1).
+       CSV ⇒ all cells arrive as strings; lpNum/lpStr coerce per field. Only
+       weeks already present in EPCI_DATA (64/65/66) are overlaid; extras ignored.
        ============================================================ */
     function lpNum(v){
       if (typeof v === "number") return v;

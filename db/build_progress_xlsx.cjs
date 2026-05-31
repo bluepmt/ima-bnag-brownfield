@@ -153,26 +153,23 @@ const FONT = { name: 'Times New Roman', size: 11 };
 const HEAD = { name: 'Times New Roman', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
 const HEAD_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF24397A' } };
 
-function addSheet(name, tableName, columns, rows, widths, note) {
-  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: note ? 2 : 1 }] });
-  let top = 1;
-  if (note) {
-    ws.getCell('A1').value = note;
-    ws.getCell('A1').font = { name: 'Times New Roman', size: 10, italic: true, color: { argb: 'FF888888' } };
-    top = 2;
-  }
+// NOTE: headers MUST be in row 1 — the live reader (Google Sheets gviz CSV,
+// functions/_lib/sheets.js) treats row 1 as the header row. Do not add banner
+// rows above the table. Per-sheet guidance lives in docs/BACKEND_SETUP.md §G.
+// The trailing `note` arg on the calls below is kept for documentation but ignored.
+function addSheet(name, tableName, columns, rows, widths /* , note (ignored) */) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.addTable({
     name: tableName,
-    ref: `A${top}`,
+    ref: 'A1',
     headerRow: true,
     style: { theme: 'TableStyleLight9', showRowStripes: true },
     columns: columns.map(c => ({ name: c, filterButton: true })),
     rows,
   });
   // style header + body font
-  const headerRow = ws.getRow(top);
-  headerRow.eachCell(c => { c.font = HEAD; c.fill = HEAD_FILL; c.alignment = { vertical: 'middle' }; });
-  for (let r = top + 1; r <= top + rows.length; r++) {
+  ws.getRow(1).eachCell(c => { c.font = HEAD; c.fill = HEAD_FILL; c.alignment = { vertical: 'middle' }; });
+  for (let r = 2; r <= 1 + rows.length; r++) {
     ws.getRow(r).eachCell(c => { if (!c.font || !c.font.bold) c.font = FONT; });
   }
   (widths || []).forEach((w, i) => { ws.getColumn(i + 1).width = w; });

@@ -76,8 +76,8 @@ Bấm **Save**. (Đây là lý do code dùng `env.DB`.)
 Làm 1 lần:
 
 1. Mở https://sheets.google.com (đăng nhập Gmail) → **Blank** → **File → Import** → tab **Upload** → chọn `docs/IMA_Progress.xlsx` → **Insert new sheet(s)** → **Import data**.
-   - Sẽ ra 9 tab: `KPI, Phase, Sections, Variance, Milestones, Engineering, Procurement, SCurve, WPInfo`. **Giữ nguyên tên tab + hàng tiêu đề (dòng 1).**
-   - Xoá tab trống mặc định (`Sheet1`) nếu có.
+   - Ra **16 tab**: 9 tab hiện (README + ENG/FAB/LOG/SITE/COMM + Procurement + HSE + Milestones) và 7 tab **ẩn** mà web đọc (KPI, Phase, Sections, Variance, Engineering, SCurve, WPInfo). Đọc tab **README** trước.
+   - **Giữ nguyên tên tab + hàng tiêu đề.** Xoá tab trống mặc định (`Sheet1`) nếu có. (Import .xlsx giữ nguyên trạng thái ẩn của 7 tab; nếu hiện hết, có thể ẩn lại — chuột phải tab → Hide.)
 2. **Định dạng cột ngày là text** (tránh Google tự đổi `01-Jul-2026` → kiểu ngày khác): ở tab `Milestones` chọn cột `Baseline`,`Forecast`; tab `Procurement` chọn `PO`,`FAT`,`Site` → menu **Format → Number → Plain text**. (Import từ .xlsx thường đã giữ text — bước này chỉ để chắc.)
 3. **Chia sẻ công khai chỉ-xem:** nút **Share** (góc phải) → mục **General access** → đổi **Restricted** → **Anyone with the link** → vai trò **Viewer** → **Done**. (Backend chỉ đọc; không ai sửa được nếu không có quyền edit.)
 4. **Lấy Spreadsheet ID** từ URL — phần giữa `/d/` và `/edit`:
@@ -91,33 +91,39 @@ Làm 1 lần:
 
 ---
 
-## G. Cấu trúc 9 tab + cách sửa số
+## G. Cấu trúc workbook + cách dùng
 
-File mẫu [`docs/IMA_Progress.xlsx`](IMA_Progress.xlsx) đã chứa toàn bộ số liệu hiện tại của trang 08 (tuần 64/65/66 + milestones + procurement + S-curve). Sau khi import (bước F), Sheet có 9 tab. Backend đọc **theo đúng tên tab**, **hàng 1 là tiêu đề**.
+[`docs/IMA_Progress.xlsx`](IMA_Progress.xlsx) là **form theo dõi EPCI** đã seed số hiện tại của trang 08. Hai lớp:
 
-| Tab | Nội dung | Sửa hằng tuần? |
-|---|---|---|
-| `KPI`         | KPI đầu trang theo tuần (overall %, SPI, HSE, số risk/NCR/punch…) | ✅ |
-| `Phase`       | % 6 workfront — Planned/Actual mỗi tuần (số 0–100) | ✅ |
-| `Sections`    | Chi tiết từng tab (`section.field`, vd `fabrication.ton`) — giữ đúng format chữ | ✅ |
-| `Variance`    | 13 điểm schedule-variance mỗi tuần | ✅ |
-| `Milestones`  | Key Dates (Name / Baseline / Forecast / Status) | khi có thay đổi |
-| `Engineering` | Heatmap discipline (Actual/Target là số) | khi có thay đổi |
-| `Procurement` | Long-lead packages (Prog là số 0–100) | khi có thay đổi |
-| `SCurve`      | Đường S-curve baseline (Plan Rev.00), theo tháng | hiếm khi (baseline) |
-| `WPInfo`      | Tên + trọng số 10 Work Package | hiếm khi |
+### Lớp 1 — sheet HIỆN (team nhập hằng ngày)
 
-**Quy tắc sửa số:**
-- **Không đổi tên tab, không xoá/đổi hàng tiêu đề (dòng 1).** Chỉ sửa giá trị bên dưới.
-- Cột tuần ở `KPI`/`Sections` tên **`Wk64`, `Wk65`, `Wk66`**. Thêm tuần mới = thêm cột `WkNN` (vd `Wk67`) — *lưu ý:* web hiện chỉ render 3 tuần 64/65/66; muốn hiện tuần mới cần sửa code trang 08 (báo mình).
-- `Phase` dùng cột `P64/A64/P65/A65/P66/A66` (P = Planned, A = Actual).
-- `Sections`: **giữ đúng định dạng chữ** như mẫu (vd `388 / 450 T`, `99.0%`, `2,560`) — web hiển thị nguyên văn. Đừng đổi cột `Key`.
-- Ô là **số** (Phase, Variance, Engineering Actual/Target, Procurement Prog, SCurve) nhập số thuần, không kèm `%`.
-- Ô **ngày** (Milestones, Procurement) để cột ở Plain text (bước F.2) cho đúng dạng `dd-Mmm-yyyy`.
+| Tab | Nội dung |
+|---|---|
+| `README` | Hướng dẫn dùng (đọc trước) |
+| `ENG` `FAB` `LOG` `SITE` `COMM` | Log task mỗi discipline — cột chuẩn PMO (WBS, Description, **Weight %**, Plan/Actual Start-Finish, **% Complete**, Status, Responsible, Remarks). Ô **"Auto %"** (góc trên, xanh) tự tính tiến độ Actual = `Σ(Weight×%Complete)/ΣWeight`. |
+| `Procurement` | List 16 long-lead package — cập nhật `Prog` (0–100) + mốc PO/FAT/Site. *(web đọc trực tiếp)* |
+| `HSE` | Log theo tuần: Safe Manhours / LTI / Observations / NCR |
+| `Milestones` | Key Dates — cập nhật Forecast + Status. *(web đọc trực tiếp)* |
+
+### Lớp 2 — sheet ẨN (web đọc, đừng sửa tay)
+
+`KPI · Phase · Sections · Variance · Engineering · SCurve · WPInfo`
+- **Tuần mới nhất (Wk66): Actual % của Phase + Sections là CÔNG THỨC** kéo từ ô Auto % của các sheet ENG/FAB/LOG/SITE/COMM. Team sửa task ở lớp 1 → các số này tự đổi.
+- Các ô đếm/KPI (PO, NCR, punch, manhours, SPI, overall %…) và cột tuần cũ (Wk64/65) = số tĩnh, **gõ tay** (đúng kiểu Hybrid bạn chọn).
+- Bỏ ẩn để xem/sửa: chuột phải tab → **Unhide**.
+
+### Quy tắc
+- **Không đổi tên tab, không xoá/đổi hàng tiêu đề.**
+- Cột là **số** (Weight, % Complete, Phase, Variance, Procurement Prog, SCurve) → nhập số thuần (0–100), không kèm `%`.
+- Cột **ngày** (Milestones, Procurement) để **Plain text** (bước F.2) cho đúng dạng `dd-Mmm-yyyy`.
+- `Sections`: ô tĩnh giữ đúng format chữ như mẫu (vd `388 / 450 T`, `2,560`).
+
+### Thêm tuần mới (giữ trend)
+Cuối tuần: ở `KPI`/`Phase`/`Sections`, copy cột tuần hiện tại → **Paste special → Values only** (chốt số) → thêm cột tuần mới (vd `Wk67`) sao chép công thức tuần cũ. *Lưu ý:* trang 08 hiện render 3 tuần 64/65/66; muốn hiện tuần mới cần sửa code trang 08 (báo mình).
 
 Sửa xong → web tự cập nhật (cache 5 phút). Một tab lỗi/thiếu → trang 08 tự dùng số mô phỏng cho riêng phần đó (không vỡ trang).
 
-> Tạo lại file mẫu .xlsx (nếu cần): `npm i exceljs` rồi `node db/build_progress_xlsx.cjs <đường-dẫn-out>`.
+> Tạo lại file mẫu (nếu cần): `npm i exceljs` rồi `node db/build_progress_xlsx.cjs <out.xlsx>`.
 
 ---
 

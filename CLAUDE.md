@@ -42,7 +42,7 @@ db/                                  # Database ops (KHÔNG serve, KHÔNG runtim
   └─ build_progress_xlsx.cjs         # Node+exceljs: sinh lại docs/IMA_Progress.xlsx (cần `npm i exceljs`)
 docs/                                # Tài liệu vận hành
   ├─ BACKEND_SETUP.md                # Hướng dẫn dựng backend/deploy từng bước (click-by-click)
-  └─ IMA_Progress.xlsx               # File mẫu Progress (9 sheet, headers row 1) → import vào Google Sheets
+  └─ IMA_Progress.xlsx               # Form EPCI: 9 sheet hiện (task log/list) + 7 sheet ẩn web đọc → import Google Sheets
 assets/                              # Ảnh, logo, sơ đồ
 Site Survey/                         # Ảnh khảo sát thực địa
 worker/                              # Cloudflare Worker proxy → Claude API (bot; KHÔNG phải Pages)
@@ -92,7 +92,8 @@ worker/                              # Cloudflare Worker proxy → Claude API (b
 ### Multi-user · Audit · Nội dung động
 - Multi-user + role: bảng `users`, endpoint `/api/users` (admin only).
 - Audit: bảng `audit_log` ghi `login`/`login_fail`/`logout`/`view`; admin xem `GET /api/audit`.
-- Progress (trang 08): kéo từ **Google Sheet công khai** (gviz CSV) — `functions/_lib/sheets.js` + `GET /api/progress`. (Lý do không dùng Excel 365/Graph: app-only Graph cần tài khoản M365 công việc; chủ dự án chỉ có Gmail cá nhân.) Sheet có **9 tab** (`KPI, Phase, Sections, Variance, Milestones, Engineering, Procurement, SCurve, WPInfo`), **headers ở row 1**; `sheets.js` fetch từng tab `…/gviz/tq?tqx=out:csv&headers=1&sheet=NAME`, parse CSV (RFC4180) → trả `{ tables, errors, fetchedAt }`. Seed: import `docs/IMA_Progress.xlsx` vào Google Sheets. Trang 08 (`applyLiveProgress()`) ghi đè data mô phỏng `EPCI_DATA` khi có data thật, fallback mô phỏng khi 503/lỗi. Env: `SHEETS_ID` (bắt buộc), `SHEETS_TABLES` (optional). Layout cột: xem `docs/BACKEND_SETUP.md` §F–G.
+- Progress (trang 08): kéo từ **Google Sheet công khai** (gviz CSV) — `functions/_lib/sheets.js` + `GET /api/progress`. (Lý do không dùng Excel 365/Graph: app-only Graph cần tài khoản M365 công việc; chủ dự án chỉ có Gmail cá nhân.) Web đọc **9 tab logic** (`KPI, Phase, Sections, Variance, Milestones, Engineering, Procurement, SCurve, WPInfo`), **headers row 1**; `sheets.js` fetch từng tab `…/gviz/tq?tqx=out:csv&headers=1&sheet=NAME`, parse CSV (RFC4180) → `{ tables, errors, fetchedAt }`. Trang 08 (`applyLiveProgress()`) ghi đè `EPCI_DATA` khi có data, fallback khi 503/lỗi. Env: `SHEETS_ID` (bắt buộc), `SHEETS_TABLES` (optional).
+- **Form workbook (`docs/IMA_Progress.xlsx`, sinh bởi `db/build_progress_xlsx.cjs`)** = công cụ team dùng, import vào Google Sheets: **9 sheet HIỆN** (README; task log PMO `ENG/FAB/LOG/SITE/COMM` có ô Auto% = `SUMPRODUCT(Weight,%Complete)/SUM(Weight)`; `Procurement` 16 package; `HSE` log tuần; `Milestones`) + **7 sheet ẨN** web đọc (`KPI, Phase, Sections, Variance, Engineering, SCurve, WPInfo`). Hybrid: Phase/Sections **Actual % tuần hiện tại = công thức** trỏ tới ô Auto% của sheet discipline; counts/KPI/tuần cũ = tĩnh gõ tay. `Procurement`+`Milestones` là sheet hiện nhưng web đọc trực tiếp (tên tab khớp). gviz đọc được cả sheet ẩn. Web vẫn đọc đúng 9 tên tab → **không phải sửa code khi đổi form**.
 
 ### Bảo mật
 - Hosting: **Cloudflare Pages** (chuyển từ GitHub Pages) để middleware chặn được cả file `.html` tĩnh trước khi serve.
